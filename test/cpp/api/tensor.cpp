@@ -10,12 +10,12 @@
 
 template <typename T>
 bool exactly_equal(at::Tensor left, T right) {
-  return at::_local_scalar(left).to<T>() == right;
+  return left.item<T>() == right;
 }
 
 template <typename T>
 bool almost_equal(at::Tensor left, T right, T tolerance = 1e-4) {
-  return std::abs(at::_local_scalar(left).to<T>() - right) < tolerance;
+  return std::abs(left.item<T>() - right) < tolerance;
 }
 
 #define REQUIRE_TENSOR_OPTIONS(device_, index_, type_, layout_)            \
@@ -213,12 +213,12 @@ TEST(TensorTest, ContainsCorrectValuesWhenConstructedFromVector) {
 }
 
 TEST(TensorTest, UsesOptionsThatAreSupplied) {
-  auto tensor = at::tensor(123, dtype(at::kFloat)) + 0.5;
+  auto tensor = at::tensor(123, at::dtype(at::kFloat)) + 0.5;
   ASSERT_EQ(tensor.numel(), 1);
   ASSERT_EQ(tensor.dtype(), at::kFloat);
   ASSERT_TRUE(almost_equal(tensor[0], 123.5));
 
-  tensor = at::tensor({1.1, 2.2, 3.3}, dtype(at::kInt));
+  tensor = at::tensor({1.1, 2.2, 3.3}, at::dtype(at::kInt));
   ASSERT_EQ(tensor.numel(), 3);
   ASSERT_EQ(tensor.dtype(), at::kInt);
   ASSERT_EQ(tensor.layout(), at::kStrided);
@@ -276,5 +276,31 @@ TEST(TensorTest, FromBlobWithStrides) {
       // NOTE: This is column major because the strides are swapped.
       EXPECT_EQ(tensor[i][j].item<int32_t>(), 1 + (j * tensor.size(1)) + i);
     }
+  }
+}
+
+TEST(TensorTest, Item) {
+  {
+    torch::Tensor tensor = torch::tensor(3.14);
+    torch::Scalar scalar = tensor.item();
+    ASSERT_NEAR(scalar.to<float>(), 3.14, 1e-5);
+  }
+  {
+    torch::Tensor tensor = torch::tensor(123);
+    torch::Scalar scalar = tensor.item();
+    ASSERT_EQ(scalar.to<int>(), 123);
+  }
+}
+
+TEST(TensorTest, Item_CUDA) {
+  {
+    torch::Tensor tensor = torch::tensor(3.14, torch::kCUDA);
+    torch::Scalar scalar = tensor.item();
+    ASSERT_NEAR(scalar.to<float>(), 3.14, 1e-5);
+  }
+  {
+    torch::Tensor tensor = torch::tensor(123, torch::kCUDA);
+    torch::Scalar scalar = tensor.item();
+    ASSERT_EQ(scalar.to<int>(), 123);
   }
 }
